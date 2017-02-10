@@ -73,13 +73,18 @@ public class BlockingRingBuffer {
     /**
      * 
      * @param maxCount
+     * @param maxSize
+     *            maximum number of bytes to drain from the buffer (sum of
+     *            drained elements). Ignored for the first element retrieved,
+     *            such that single long elements cannot block the whole buffer.
+     *            -1 for no limit
      * @param maxWait
      *            duration to wait maximally for at least one element to become
      *            available, null for infinite wait, {@link Duration#ZERO} for
      *            no waiting
      * @return
      */
-    public synchronized List<byte[]> drain(int maxCount, Duration maxWait) {
+    public synchronized List<byte[]> drain(int maxCount, int maxSize, Duration maxWait) {
 
         waitUntilElementsAvailable(maxWait);
         if (available == 0)
@@ -96,8 +101,22 @@ public class BlockingRingBuffer {
         if (firstSlot < 0)
             firstSlot += capacity;
 
+        int elementLengthSum = 0;
+
         do {
-            int elementLength = readInt();
+
+            int elementLength;
+            {
+                int oldAvailable = available;
+                elementLength = readInt();
+                elementLengthSum += elementLength;
+
+                // don't break when retrieving first element
+                if (maxSize >= 0 && !result.isEmpty() && elementLengthSum > maxSize) {
+                    available = oldAvailable;
+                    break;
+                }
+            }
 
             firstSlot++;
             if (firstSlot >= capacity)
@@ -150,7 +169,9 @@ public class BlockingRingBuffer {
             Instant end = now.plus(actualWait);
             while (true) {
                 try {
-                    wait(Duration.between(now, end).toMillis());
+                    long millis = Duration.between(now, end).toMillis();
+                    if (millis > 0 || maxWait == null)
+                        wait(millis);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
