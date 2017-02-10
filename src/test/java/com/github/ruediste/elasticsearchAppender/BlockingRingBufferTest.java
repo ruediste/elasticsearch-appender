@@ -2,12 +2,14 @@ package com.github.ruediste.elasticsearchAppender;
 
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.Charset;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -122,5 +124,49 @@ public class BlockingRingBufferTest {
         for (int i = 0; i < count; i++) {
             put("e" + putCounter++);
         }
+    }
+
+    @Test
+    public void testIntToBytes() throws Exception {
+        assertArrayEquals(new byte[] { 0x3 }, buf.intToBytes(3));
+        assertArrayEquals(new byte[] { (byte) 0xfe, 0x1 }, buf.intToBytes(0xfe));
+        assertArrayEquals(new byte[] { (byte) 0xa3, 0x2 }, buf.intToBytes(0x123));
+        // 0001 00 10 0011 0 100 0101
+        // 0001 00 |10 0011 0 |100 0101
+        assertArrayEquals(new byte[] { (byte) 0xc5, (byte) 0xc6, 0x4, 0x0 }, buf.intToBytes(0x12345));
+
+        // 0x347d8737
+        // 0011 0100 0111 1101 1000 0111 0011 0111
+        // 1101 0001 1111 0110 |000 1110 |011 0111
+        // d1 f6 8e b7
+        assertArrayEquals(new byte[] { (byte) 0xb7, (byte) 0x8e, (byte) 0xf6, (byte) 0xd1 },
+                buf.intToBytes(0x347d8737));
+    }
+
+    @Test
+    public void testReadInt() throws Exception {
+        checkIntHandling(0x347d8737);
+        checkIntHandling(3);
+        checkIntHandling(500);
+        checkIntHandling(0x123);
+    }
+
+    @Test(expected = ArithmeticException.class)
+    public void testIntHandlingOverflow() throws Exception {
+        checkIntHandling(1 << 30);
+
+    }
+
+    @Test
+    public void testIntHandlingRandom() throws Exception {
+        Random r = new Random(1);
+        for (long i = 0; i < 10000000; i++) {
+            checkIntHandling(r.nextInt(1 << 30));
+        }
+    }
+
+    private void checkIntHandling(int value) {
+        buf.setBufferContents(buf.intToBytes(value));
+        assertEquals(value, buf.readInt());
     }
 }

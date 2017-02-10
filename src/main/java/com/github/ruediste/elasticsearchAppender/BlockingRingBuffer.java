@@ -1,6 +1,5 @@
 package com.github.ruediste.elasticsearchAppender;
 
-import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -9,7 +8,7 @@ import java.util.List;
 
 public class BlockingRingBuffer {
 
-    public byte[] buffer = null;
+    private byte[] buffer = null;
 
     private int capacity = 0;
     private int writePos = 0;
@@ -34,11 +33,10 @@ public class BlockingRingBuffer {
         for (byte[] element : elementParts) {
             elementLengthSum += element.length;
         }
+        byte[] lengthBB = intToBytes(elementLengthSum);
         synchronized (this) {
-            int lengthByteCount = 1;
-            if (available + elementLengthSum + lengthByteCount <= capacity) {
-                // TODO: proper handling of length
-                appendBytes(ByteBuffer.allocate(lengthByteCount).put((byte) elementLengthSum).array());
+            if (available + elementLengthSum + lengthBB.length <= capacity) {
+                appendBytes(lengthBB);
 
                 for (byte[] element : elementParts) {
                     appendBytes(element);
@@ -99,9 +97,7 @@ public class BlockingRingBuffer {
             firstSlot += capacity;
 
         do {
-            // TODO: proper handling of length
-            int elementLength = buffer[firstSlot];
-            available--;
+            int elementLength = readInt();
 
             firstSlot++;
             if (firstSlot >= capacity)
@@ -182,6 +178,87 @@ public class BlockingRingBuffer {
 
     public int remainingCapacity() {
         return this.capacity - this.available;
+    }
+
+    void setBufferContents(byte[] bb) {
+        System.arraycopy(bb, 0, buffer, 0, bb.length);
+        writePos = bb.length;
+        available = bb.length;
+    }
+
+    int readInt() {
+        int firstSlot = writePos - available;
+        if (firstSlot < 0)
+            firstSlot += capacity;
+
+        // first byte
+        byte b = buffer[firstSlot++];
+        available--;
+        if ((b & 0x80) == 0) {
+            return b;
+        }
+        int result = b & 0x7f;
+
+        // second byte
+        if (firstSlot >= capacity)
+            firstSlot -= capacity;
+        b = buffer[firstSlot++];
+        available--;
+        result |= (b & 0x7f) << 7;
+        if ((b & 0x80) == 0) {
+            return result;
+        }
+
+        // remaining bytes
+        if (firstSlot >= capacity)
+            firstSlot -= capacity;
+        b = buffer[firstSlot++];
+        available--;
+        result |= (b << 14) & (0xff << 14);
+
+        if (firstSlot >= capacity)
+            firstSlot -= capacity;
+        b = buffer[firstSlot++];
+        available--;
+        result |= (b << 22) & (0xff << 22);
+
+        return result;
+    }
+
+    byte[] intToBytes(int i) {
+        int tmp = i;
+        int first = tmp & 0x7F;
+        tmp &= ~0x7F;
+        if (tmp == 0) {
+            byte[] result = new byte[1];
+            result[0] = (byte) first;
+            return result;
+        }
+        tmp >>>= 7;
+        first |= 0x80;
+
+        int second = tmp & 0x7F;
+        tmp &= ~0x7F;
+        if (tmp == 0) {
+            byte[] result = new byte[2];
+            result[0] = (byte) first;
+            result[1] = (byte) second;
+            return result;
+        }
+        tmp >>>= 7;
+        second |= 0x80;
+
+        int third = tmp & 0xFFFF;
+        tmp &= ~0xFFFF;
+        if (tmp == 0) {
+            byte[] result = new byte[4];
+            result[0] = (byte) first;
+            result[1] = (byte) second;
+            result[2] = (byte) third;
+            result[3] = (byte) (third >>> 8);
+            return result;
+        }
+        throw new ArithmeticException("Length is more than 2**29");
     }
 
 }
