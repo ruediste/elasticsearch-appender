@@ -1,11 +1,15 @@
 package com.github.ruediste.elasticsearchAppender;
 
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class BlockingRingBuffer {
 
-    public Object[] elements = null;
+    public byte[] buffer = null;
 
     private int capacity = 0;
     private int writePos = 0;
@@ -13,47 +17,59 @@ public class BlockingRingBuffer {
 
     public BlockingRingBuffer(int capacity) {
         this.capacity = capacity;
-        this.elements = new Object[capacity];
+        this.buffer = new byte[capacity];
     }
 
-    public synchronized boolean put(Object element) {
-        if (available < capacity) {
-            if (writePos >= capacity) {
-                writePos = 0;
+    /**
+     * Put an element into the buffer.
+     * 
+     * @param elementParts
+     *            parts of the element. The individual arrays will be
+     *            concatenated
+     * @return true if the element has been added, false if there was no space
+     *         remaining
+     */
+    public boolean put(byte[]... elementParts) {
+        int elementLengthSum = 0;
+        for (byte[] element : elementParts) {
+            elementLengthSum += element.length;
+        }
+        synchronized (this) {
+            int lengthByteCount = 1;
+            if (available + elementLengthSum + lengthByteCount <= capacity) {
+                // TODO: proper handling of length
+                appendBytes(ByteBuffer.allocate(lengthByteCount).put((byte) elementLengthSum).array());
+
+                for (byte[] element : elementParts) {
+                    appendBytes(element);
+                }
+
+                return true;
+            } else {
+                // discard
+                return false;
             }
-            if (available == 0)
-                notifyAll();
-            elements[writePos] = element;
-            writePos++;
-            available++;
-            return true;
+        }
+    }
+
+    private void appendBytes(byte[] element) {
+        if (writePos >= capacity) {
+            writePos = 0;
+        }
+        if (writePos + element.length > capacity) {
+            // need to split
+            int firstPart = capacity - writePos;
+            int secondPart = element.length - firstPart;
+            System.arraycopy(element, 0, buffer, writePos, firstPart);
+            System.arraycopy(element, firstPart, buffer, 0, secondPart);
+            writePos += secondPart;
         } else {
-            // discard
-            return false;
+            System.arraycopy(element, 0, buffer, writePos, element.length);
+            writePos += element.length;
         }
-    }
-
-    public synchronized Object take() {
-        while (available == 0) {
-            try {
-                wait();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        if (available == this.capacity) {
-            // notify all waiting threads, since the queue was full before
+        if (available == 0)
             notifyAll();
-        }
-
-        int nextSlot = writePos - available;
-        if (nextSlot < 0) {
-            nextSlot += capacity;
-        }
-        Object nextObj = elements[nextSlot];
-        available--;
-        return nextObj;
-
+        available += element.length;
     }
 
     /**
@@ -65,38 +81,58 @@ public class BlockingRingBuffer {
      *            no waiting
      * @return
      */
-    public synchronized Object[] drain(int maxCount, Duration maxWait) {
+    public synchronized List<byte[]> drain(int maxCount, Duration maxWait) {
 
         waitUntilElementsAvailable(maxWait);
         if (available == 0)
-            return new Object[] {};
+            return Collections.emptyList();
 
         if (available == this.capacity) {
             // notify all waiting threads, since the queue was full before
             notifyAll();
         }
 
+        List<byte[]> result = new ArrayList<>();
+
         int firstSlot = writePos - available;
         if (firstSlot < 0)
             firstSlot += capacity;
 
-        int resultLength = Math.min(available, maxCount);
-        Object[] result = new Object[resultLength];
+        do {
+            // TODO: proper handling of length
+            int elementLength = buffer[firstSlot];
+            available--;
 
-        if (firstSlot + resultLength < capacity) {
-            // all elements are in one chunk
-            System.arraycopy(elements, firstSlot, result, 0, resultLength);
-        } else {
-            // there is a wrap around
+            firstSlot++;
+            if (firstSlot >= capacity)
+                firstSlot -= capacity;
 
-            // copy the elements up to the end of elements
-            int firstChunkLength = capacity - firstSlot;
-            System.arraycopy(elements, firstSlot, result, 0, firstChunkLength);
+            // read element
+            byte[] element = new byte[elementLength];
 
-            // copy the remaining elements from the start of elements
-            System.arraycopy(elements, 0, result, firstChunkLength, resultLength - firstChunkLength);
-        }
-        available -= resultLength;
+            if (firstSlot + elementLength <= capacity) {
+                // all elements are in one chunk
+                System.arraycopy(buffer, firstSlot, element, 0, elementLength);
+                firstSlot += elementLength;
+            } else {
+                // there is a wrap around
+
+                // copy the elements up to the end of elements
+                int firstChunkLength = capacity - firstSlot;
+                int secondChunkLength = elementLength - firstChunkLength;
+
+                System.arraycopy(buffer, firstSlot, element, 0, firstChunkLength);
+
+                // copy the remaining elements from the start of elements
+                System.arraycopy(buffer, 0, element, firstChunkLength, secondChunkLength);
+                firstSlot = secondChunkLength;
+            }
+            if (firstSlot >= capacity)
+                firstSlot -= capacity;
+            result.add(element);
+            available -= elementLength;
+        } while (available > 0 && result.size() < maxCount);
+
         return result;
 
     }
