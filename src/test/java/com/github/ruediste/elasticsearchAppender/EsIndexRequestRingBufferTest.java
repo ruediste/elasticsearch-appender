@@ -17,10 +17,10 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-public class BlockingRingBufferTest {
+public class EsIndexRequestRingBufferTest {
 
     Timer timer;
-    BlockingRingBuffer buf;
+    EsIndexRequestRingBuffer buf;
     int putCounter;
 
     Charset utf8 = Charset.forName("UTF-8");
@@ -28,7 +28,7 @@ public class BlockingRingBufferTest {
     @Before
     public void setUp() throws Exception {
         timer = new Timer(true);
-        buf = new BlockingRingBuffer(100);
+        buf = new EsIndexRequestRingBuffer(100);
         putCounter = 0;
     }
 
@@ -40,6 +40,17 @@ public class BlockingRingBufferTest {
     public void testPutTake() {
         put("foo");
         assertArrayEquals(new Object[] { "foo" }, drain(10));
+    }
+
+    @Test
+    public void testPutTakeRandom() {
+        Random r = new Random(1);
+        for (int i = 0; i < 1000000; i++) {
+            int putCount = r.nextInt(4);
+            for (int p = 0; p < putCount; p++)
+                buf.put(new byte[r.nextInt(20)]);
+            buf.drain(r.nextInt(4), -1, Duration.ZERO);
+        }
     }
 
     @Test
@@ -123,7 +134,7 @@ public class BlockingRingBufferTest {
     @Test
     public void testDrainOverflow() throws Exception {
         // 3 bytes times five elements
-        buf = new BlockingRingBuffer(3 * 5);
+        buf = new EsIndexRequestRingBuffer(3 * 5);
         put(3);
         drain(10);
         put(4);
@@ -133,7 +144,7 @@ public class BlockingRingBufferTest {
     @Test
     public void testDrainLimit() throws Exception {
         // 3 bytes times five elements
-        buf = new BlockingRingBuffer(3 * 5);
+        buf = new EsIndexRequestRingBuffer(3 * 5);
         put(3);
         drain(10);
         put(2);

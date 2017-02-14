@@ -6,7 +6,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class BlockingRingBuffer {
+/**
+ * Ring buffer designed to store serialized log events
+ */
+public class EsIndexRequestRingBuffer {
 
     private byte[] buffer = null;
 
@@ -14,7 +17,7 @@ public class BlockingRingBuffer {
     private int writePos = 0;
     private int available = 0;
 
-    public BlockingRingBuffer(int capacity) {
+    public EsIndexRequestRingBuffer(int capacity) {
         this.capacity = capacity;
         this.buffer = new byte[capacity];
     }
@@ -51,20 +54,19 @@ public class BlockingRingBuffer {
     }
 
     private void appendBytes(byte[] element) {
-        if (writePos >= capacity) {
-            writePos = 0;
-        }
         if (writePos + element.length > capacity) {
             // need to split
             int firstPart = capacity - writePos;
             int secondPart = element.length - firstPart;
             System.arraycopy(element, 0, buffer, writePos, firstPart);
             System.arraycopy(element, firstPart, buffer, 0, secondPart);
-            writePos += secondPart;
+            writePos = secondPart;
         } else {
             System.arraycopy(element, 0, buffer, writePos, element.length);
             writePos += element.length;
         }
+        if (writePos >= capacity)
+            writePos -= capacity;
         if (available == 0)
             notifyAll();
         available += element.length;
@@ -97,10 +99,6 @@ public class BlockingRingBuffer {
 
         List<byte[]> result = new ArrayList<>();
 
-        int firstSlot = writePos - available;
-        if (firstSlot < 0)
-            firstSlot += capacity;
-
         int elementLengthSum = 0;
 
         do {
@@ -118,9 +116,9 @@ public class BlockingRingBuffer {
                 }
             }
 
-            firstSlot++;
-            if (firstSlot >= capacity)
-                firstSlot -= capacity;
+            int firstSlot = writePos - available;
+            if (firstSlot < 0)
+                firstSlot += capacity;
 
             // read element
             byte[] element = new byte[elementLength];
@@ -142,8 +140,6 @@ public class BlockingRingBuffer {
                 System.arraycopy(buffer, 0, element, firstChunkLength, secondChunkLength);
                 firstSlot = secondChunkLength;
             }
-            if (firstSlot >= capacity)
-                firstSlot -= capacity;
             result.add(element);
             available -= elementLength;
         } while (available > 0 && result.size() < maxCount);
