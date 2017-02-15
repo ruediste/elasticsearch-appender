@@ -39,17 +39,27 @@ public class EsIndexRequestRingBufferTest {
     @Test
     public void testPutTake() {
         put("foo");
+        assertEquals(1, buf.availableElements());
         assertArrayEquals(new Object[] { "foo" }, drain(10));
+        assertEquals(0, buf.availableElements());
     }
 
     @Test
     public void testPutTakeRandom() {
         Random r = new Random(1);
+        int available = 0;
         for (int i = 0; i < 1000000; i++) {
+            // put
             int putCount = r.nextInt(4);
             for (int p = 0; p < putCount; p++)
-                buf.put(new byte[r.nextInt(20)]);
-            buf.drain(r.nextInt(4), -1, Duration.ZERO);
+                if (buf.put(new byte[r.nextInt(20)]))
+                    available++;
+            assertEquals(available, buf.availableElements());
+
+            // drain
+            List<byte[]> drained = buf.drain(r.nextInt(4), -1, Duration.ZERO);
+            available -= drained.size();
+            assertEquals(available, buf.availableElements());
         }
     }
 

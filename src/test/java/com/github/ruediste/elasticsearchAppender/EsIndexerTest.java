@@ -17,7 +17,7 @@ public class EsIndexerTest {
     @Before
     public void setUp() throws Exception {
         processedRequests = new ArrayList<>();
-        indexer = new EsIndexer("test") {
+        indexer = new EsIndexer("test", new EsIndexerLoggerConsole()) {
             @Override
             protected void processElements(List<byte[]> elements) {
                 elements.forEach(bb -> processedRequests.add(toIndexRequest(bb)));

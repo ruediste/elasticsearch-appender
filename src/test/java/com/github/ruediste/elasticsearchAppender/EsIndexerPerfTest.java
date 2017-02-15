@@ -22,7 +22,7 @@ public class EsIndexerPerfTest {
         processed = 0;
         allProcessed = new CountDownLatch(1);
         expectedCount = 1000000;
-        EsIndexer indexer = new EsIndexer("test") {
+        EsIndexer indexer = new EsIndexer("test", new EsIndexerLoggerConsole()) {
             @Override
             protected void processElements(List<byte[]> elements) {
                 processed += elements.size();

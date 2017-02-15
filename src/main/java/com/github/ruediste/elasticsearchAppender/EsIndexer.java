@@ -13,15 +13,19 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongConsumer;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
+
+import com.google.common.base.Throwables;
 
 import io.searchbox.client.JestClient;
 import io.searchbox.client.JestClientFactory;
 import io.searchbox.client.config.HttpClientConfig;
 import io.searchbox.core.Bulk;
 import io.searchbox.core.BulkResult;
+import io.searchbox.core.BulkResult.BulkResultItem;
 import io.searchbox.core.Index;
 
 /**
@@ -61,21 +65,6 @@ public class EsIndexer implements EsIndexerMBean {
     public int maxBulkMemorySize = 1 * 1024 * 1024;
 
     /**
-     * Amount of time to wait if a small bulk is taken out of the buffer. After
-     * the wait, draining is tried again. Avoids always sending the first
-     * request in a bulk of size 1.
-     * 
-     * @see #smallBulkThreshold
-     */
-    public Duration smallBulkWait = Duration.ofMillis(10);
-
-    /**
-     * Number of documents below which a bulk is considered small and the
-     * {@link #smallBulkWait} is waited to see if the bulk fills up.
-     */
-    public int smallBulkThreshold = 50;
-
-    /**
      * Time to wait while stopping until all events are processed
      */
     public Duration stopTimeout = Duration.ofSeconds(10);
@@ -85,6 +74,7 @@ public class EsIndexer implements EsIndexerMBean {
      */
     public String esUrl = "http://localhost:9200";
 
+    public int maxStringLength;
     /**
      * If true (default), an JMX MBean will be registered to monitor this
      * indexer
@@ -100,21 +90,115 @@ public class EsIndexer implements EsIndexerMBean {
      * created during {@link #start()} using {@link #esUrl}
      */
     public JestClient jestClient;
-    private final String name;
 
-    public EsIndexer(String name) {
+    /**
+     * Name of this indexer. Used to derive other names from
+     */
+    public String name;
+
+    /**
+     * Logger callback to enable logging by the indexer
+     */
+    public EsIndexerLogger logger;
+
+    public int getMaxStringLength() {
+        return maxStringLength;
+    }
+
+    public void setMaxStringLength(int maxStringLength) {
+        this.maxStringLength = maxStringLength;
+    }
+
+    public String getThreadName() {
+        return threadName;
+    }
+
+    public void setThreadName(String threadName) {
+        this.threadName = threadName;
+    }
+
+    public int getCapacity() {
+        return capacity;
+    }
+
+    public void setCapacity(int capacity) {
+        this.capacity = capacity;
+    }
+
+    public int getMaxBulkDocumentCount() {
+        return maxBulkDocumentCount;
+    }
+
+    public void setMaxBulkDocumentCount(int maxBulkDocumentCount) {
+        this.maxBulkDocumentCount = maxBulkDocumentCount;
+    }
+
+    public int getMaxBulkMemorySize() {
+        return maxBulkMemorySize;
+    }
+
+    public void setMaxBulkMemorySize(int maxBulkMemorySize) {
+        this.maxBulkMemorySize = maxBulkMemorySize;
+    }
+
+    public Duration getStopTimeout() {
+        return stopTimeout;
+    }
+
+    public void setStopTimeout(Duration stopTimeout) {
+        this.stopTimeout = stopTimeout;
+    }
+
+    public String getEsUrl() {
+        return esUrl;
+    }
+
+    public void setEsUrl(String esUrl) {
+        this.esUrl = esUrl;
+    }
+
+    public boolean isPerformJMXRegistration() {
+        return performJMXRegistration;
+    }
+
+    public void setPerformJMXRegistration(boolean performJMXRegistration) {
+        this.performJMXRegistration = performJMXRegistration;
+    }
+
+    public String getmBeanName() {
+        return mBeanName;
+    }
+
+    public void setmBeanName(String mBeanName) {
+        this.mBeanName = mBeanName;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
         this.name = name;
+    }
+
+    public EsIndexer() {
+
+    }
+
+    public EsIndexer(String name, EsIndexerLogger logger) {
+        this.name = name;
+        this.logger = logger;
     }
 
     public void queue(EsIndexRequest request) {
         queue(request.index, request.type, request.payload);
     }
 
-    AtomicLong totalDiscardedCount = new AtomicLong();
+    private AtomicLong totalEventDiscardedCount = new AtomicLong();
 
     public void queue(String index, String type, String payload) {
         if (softStopping || !started) {
-            totalDiscardedCount.incrementAndGet();
+            totalEventDiscardedCount.incrementAndGet();
             return;
         }
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -126,7 +210,7 @@ public class EsIndexer implements EsIndexerMBean {
         }
         if (!buffer.put(baos.toByteArray(), payload.getBytes(utf8))) {
             // discarded
-            totalDiscardedCount.incrementAndGet();
+            totalEventDiscardedCount.incrementAndGet();
         }
     }
 
@@ -196,6 +280,10 @@ public class EsIndexer implements EsIndexerMBean {
         }
     }
 
+    private boolean indexingFailing = false;
+    private volatile long totalEventIndexingFailedCount;
+    private volatile long totalEventIndexedCount;
+
     private void indexingLoop() {
         try {
             while (!hardStopping) {
@@ -221,11 +309,33 @@ public class EsIndexer implements EsIndexerMBean {
         try {
             BulkResult result = jestClient.execute(bulk.build());
             if (!result.isSucceeded()) {
-                System.err.println(result.getJsonString());
+                List<BulkResultItem> failedItems = result.getFailedItems();
+                totalEventIndexingFailedCount += failedItems.size();
+                totalEventIndexedCount += (elements.size() - failedItems.size());
+                if (!indexingFailing) {
+                    String message = "Errors in bulk index request. Bulk contained " + elements.size() + " documents, "
+                            + failedItems.size() + " failed. Bulk error message: " + result.getErrorMessage() + ".";
+                    if (failedItems.size() > 0) {
+                        message += " Error message of first failed item: " + failedItems.get(0).error;
+                    }
+                    logger.error(message + " Continuing to try, but suppressing log output");
+                    indexingFailing = true;
+                }
+            } else {
+                totalEventIndexedCount += elements.size();
+                if (indexingFailing) {
+                    logger.info("Indexing successful for the first time after a failure");
+                    indexingFailing = false;
+                }
             }
         } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            totalEventIndexingFailedCount += elements.size();
+            if (!indexingFailing) {
+                String trace = Throwables.getStackTraceAsString(e);
+                logger.error("Error while connecting to elastic search. Continuing to try but suppressing output.\n"
+                        + trace);
+                indexingFailing = true;
+            }
         }
     }
 
@@ -245,7 +355,68 @@ public class EsIndexer implements EsIndexerMBean {
     }
 
     @Override
-    public long getTotalDiscardedCount() {
-        return totalDiscardedCount.get();
+    public long getTotalEventDiscardedCount() {
+        return totalEventDiscardedCount.get();
+    }
+
+    @Override
+    public long getTotalEventIndexingFailedCount() {
+        return totalEventIndexingFailedCount;
+    }
+
+    @Override
+    public long getQueueLength() {
+        return buffer.availableElements();
+    }
+
+    @Override
+    public long getTotalEventIndexedCount() {
+        return totalEventIndexedCount;
+    }
+
+    @Override
+    public double getQueueFillFraction() {
+        return buffer.usedCapacityFraction();
+    }
+
+    @Override
+    public void resetStatistics() {
+        totalEventDiscardedCount.set(0);
+        totalEventIndexedCount = 0;
+        totalEventIndexingFailedCount = 0;
+    }
+
+    /**
+     * Truncate a string to {@link #getMaxStringLength()}
+     */
+    public String truncate(String s) {
+        if (s == null) {
+            return null;
+        }
+        if (s.length() > maxStringLength) {
+            return s.substring(0, maxStringLength) + "...";
+        }
+        return s;
+    }
+
+    private static ThreadLocal<Long> lastLogTimeStamp = new ThreadLocal<>();
+
+    /**
+     * adjust time stamp such that only one event is logged for the same milli
+     * second
+     */
+    public void calcNextTimestamp(long origTimeStamp, LongConsumer timestampConsumer, LongConsumer adjustmentConsumer) {
+        long timeStamp = origTimeStamp;
+        {
+            Long lastStamp = lastLogTimeStamp.get();
+            if (lastStamp != null && lastStamp >= timeStamp) {
+                timeStamp = lastStamp + 1;
+                adjustmentConsumer.accept(timeStamp - origTimeStamp);
+            }
+            lastLogTimeStamp.set(timeStamp);
+
+            timestampConsumer.accept(timeStamp);
+        }
+
     }
 }

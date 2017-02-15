@@ -13,9 +13,10 @@ public class EsIndexRequestRingBuffer {
 
     private byte[] buffer = null;
 
-    private int capacity = 0;
+    private final int capacity;
     private int writePos = 0;
     private int available = 0;
+    private int availableElements = 0;
 
     public EsIndexRequestRingBuffer(int capacity) {
         this.capacity = capacity;
@@ -45,6 +46,7 @@ public class EsIndexRequestRingBuffer {
                     appendBytes(element);
                 }
 
+                availableElements++;
                 return true;
             } else {
                 // discard
@@ -142,6 +144,7 @@ public class EsIndexRequestRingBuffer {
             }
             result.add(element);
             available -= elementLength;
+            availableElements--;
         } while (available > 0 && result.size() < maxCount);
 
         return result;
@@ -180,17 +183,26 @@ public class EsIndexRequestRingBuffer {
         }
     }
 
-    public void reset() {
+    public synchronized void reset() {
         this.writePos = 0;
         this.available = 0;
+        availableElements = 0;
     }
 
-    public int capacity() {
+    public synchronized double usedCapacityFraction() {
+        return ((double) available) / capacity;
+    }
+
+    public synchronized int capacity() {
         return this.capacity;
     }
 
-    public int available() {
+    public synchronized int available() {
         return this.available;
+    }
+
+    public synchronized int availableElements() {
+        return this.availableElements;
     }
 
     public int remainingCapacity() {

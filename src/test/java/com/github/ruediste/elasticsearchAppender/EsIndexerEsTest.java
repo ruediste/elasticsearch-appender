@@ -1,5 +1,7 @@
 package com.github.ruediste.elasticsearchAppender;
 
+import static org.junit.Assert.assertEquals;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Random;
@@ -17,7 +19,7 @@ public class EsIndexerEsTest {
 
     @Before
     public void setUp() throws Exception {
-        indexer = new EsIndexer("test");
+        indexer = new EsIndexer("test", new EsIndexerLoggerConsole());
         indexer.start();
     }
 
@@ -35,6 +37,30 @@ public class EsIndexerEsTest {
                     .execute(new Search.Builder("{\"query\":{\"term\":{\"id\":\"" + id + "\"}}}").build());
             return 1 == result.getTotal();
         });
+    }
+
+    @Test
+    public void testSendFailingRequest() throws InterruptedException {
+        indexer.queue("test", "test", "{malformed json}");
+        awaitTrue(() -> indexer.getTotalEventIndexingFailedCount() > 0);
+    }
+
+    @Test
+    public void perfTest() throws InterruptedException {
+        Instant start = Instant.now();
+        Instant end = start.plus(Duration.ofSeconds(10));
+        while (Instant.now().isBefore(end)) {
+            if (indexer.getQueueFillFraction() > 0.8)
+                Thread.sleep(10);
+            else
+                for (int i = 0; i < 10; i++)
+                    indexer.queue("test", "test", "{}");
+        }
+        System.out.println("ES indexing performance: "
+                + (1000.0 * indexer.getTotalEventIndexedCount() / Duration.between(start, Instant.now()).toMillis())
+                + "/s");
+        assertEquals(0, indexer.getTotalEventDiscardedCount());
+        assertEquals(0, indexer.getTotalEventIndexingFailedCount());
     }
 
     private interface ThrowingSupplier<T> {

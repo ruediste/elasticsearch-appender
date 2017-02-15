@@ -4,8 +4,8 @@
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>110</x>
-      <y>120</y>
+      <x>0</x>
+      <y>70</y>
       <w>200</w>
       <h>100</h>
     </coordinates>
@@ -19,8 +19,8 @@ esType</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>440</x>
-      <y>160</y>
+      <x>330</x>
+      <y>110</y>
       <w>280</w>
       <h>280</h>
     </coordinates>
@@ -47,8 +47,8 @@ queue(index, type, payload: Object)</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>420</x>
-      <y>480</y>
+      <x>310</x>
+      <y>430</y>
       <w>220</w>
       <h>60</h>
     </coordinates>
@@ -60,8 +60,8 @@ capacity</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>670</x>
-      <y>470</y>
+      <x>560</x>
+      <y>420</y>
       <w>230</w>
       <h>90</h>
     </coordinates>
@@ -75,8 +75,8 @@ source: String</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>210</x>
-      <y>270</y>
+      <x>100</x>
+      <y>220</y>
       <w>110</w>
       <h>90</h>
     </coordinates>
@@ -90,8 +90,8 @@ message
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>240</x>
-      <y>210</y>
+      <x>130</x>
+      <y>160</y>
       <w>90</w>
       <h>80</h>
     </coordinates>
@@ -102,8 +102,8 @@ message
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>110</x>
-      <y>390</y>
+      <x>0</x>
+      <y>340</y>
       <w>220</w>
       <h>90</h>
     </coordinates>
@@ -115,8 +115,8 @@ toIndex(prefix, timestamp)</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>480</x>
-      <y>430</y>
+      <x>370</x>
+      <y>380</y>
       <w>30</w>
       <h>70</h>
     </coordinates>
@@ -126,8 +126,8 @@ toIndex(prefix, timestamp)</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>440</x>
-      <y>50</y>
+      <x>330</x>
+      <y>0</y>
       <w>260</w>
       <h>80</h>
     </coordinates>
@@ -140,8 +140,8 @@ eventsLost()</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>580</x>
-      <y>120</y>
+      <x>470</x>
+      <y>70</y>
       <w>30</w>
       <h>60</h>
     </coordinates>
@@ -151,8 +151,8 @@ eventsLost()</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>690</x>
-      <y>420</y>
+      <x>580</x>
+      <y>370</y>
       <w>70</w>
       <h>70</h>
     </coordinates>
@@ -163,8 +163,8 @@ eventsLost()</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>300</x>
-      <y>190</y>
+      <x>190</x>
+      <y>140</y>
       <w>160</w>
       <h>40</h>
     </coordinates>
@@ -176,13 +176,39 @@ m2=1</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>140</x>
-      <y>210</y>
+      <x>30</x>
+      <y>160</y>
       <w>70</w>
       <h>200</h>
     </coordinates>
     <panel_attributes>lt=&lt;.
 &lt;&lt;use&gt;&gt;</panel_attributes>
     <additional_attributes>10.0;180.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>670</x>
+      <y>140</y>
+      <w>140</w>
+      <h>90</h>
+    </coordinates>
+    <panel_attributes>EsIndexerLogger
+--
+warn(String)
+info(String)
+error(String)</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>600</x>
+      <y>150</y>
+      <w>90</w>
+      <h>30</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;-</panel_attributes>
+    <additional_attributes>70.0;10.0;10.0;10.0</additional_attributes>
   </element>
 </diagram>
