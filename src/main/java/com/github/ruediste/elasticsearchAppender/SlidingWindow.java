@@ -3,7 +3,7 @@ package com.github.ruediste.elasticsearchAppender;
 import java.util.Arrays;
 
 /**
- * Implements a sliding window for counting events
+ * Implements a sliding window for counting events. Threadsafe
  */
 public class SlidingWindow {
 

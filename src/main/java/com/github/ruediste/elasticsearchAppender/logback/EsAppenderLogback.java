@@ -1,27 +1,35 @@
 package com.github.ruediste.elasticsearchAppender.logback;
 
-import java.time.Duration;
 import java.util.HashMap;
+import java.util.Map.Entry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.github.ruediste.elasticsearchAppender.EsAppenderHelper;
+import com.github.ruediste.elasticsearchAppender.EsAppenderHelperProps;
 import com.github.ruediste.elasticsearchAppender.EsIndexer;
 import com.github.ruediste.elasticsearchAppender.EsIndexerLogger;
+import com.github.ruediste.elasticsearchAppender.EsIndexerProps;
 import com.github.ruediste.elasticsearchAppender.EsLogRecord;
 
 import ch.qos.logback.classic.pattern.ThrowableProxyConverter;
 import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.spi.IThrowableProxy;
 import ch.qos.logback.core.UnsynchronizedAppenderBase;
 
-public class EsAppenderLogback extends UnsynchronizedAppenderBase<ILoggingEvent> {
+public class EsAppenderLogback extends UnsynchronizedAppenderBase<ILoggingEvent>
+        implements EsIndexerProps, EsAppenderHelperProps {
 
-    private EsIndexer indexer = new EsIndexer();
+    EsIndexer indexer = new EsIndexer();
+    private EsAppenderHelper helper = new EsAppenderHelper();
     private ThrowableProxyConverter throwableProxyConverter = new ThrowableProxyConverter();
+    private String esType = "log";
 
     @Override
     public void start() {
         super.start();
+        helper.start();
         throwableProxyConverter.start();
         indexer.name = getName();
         Logger log = LoggerFactory.getLogger(EsIndexer.class);
@@ -50,67 +58,46 @@ public class EsAppenderLogback extends UnsynchronizedAppenderBase<ILoggingEvent>
         super.stop();
         indexer.stop();
         throwableProxyConverter.stop();
+        helper.stop();
     }
 
     @Override
     protected void append(ILoggingEvent event) {
         EsLogRecord record = new EsLogRecord();
-        indexer.calcNextTimestamp(event.getTimeStamp(), x -> record.time = x, x -> record.timeAdjustment = x);
-        record.threadName = event.getThreadName();
-        record.loggerName = event.getLoggerName();
-        record.message = event.getFormattedMessage();
-        record.logLevel = event.getLevel().levelStr;
-        record.exceptionClass = event.getThrowableProxy().getClassName();
-        record.exceptionMessage = event.getThrowableProxy().getMessage();
-        throwableProxyConverter.start();
-        record.stackTrace = throwableProxyConverter.convert(event);
-        record.mdc = new HashMap<>(event.getMDCPropertyMap());
-        indexer.queue("", "", record);
+        helper.prepareLogRecord(record, event.getTimeStamp());
+        record.thread = event.getThreadName();
+        record.logger = event.getLoggerName();
+        record.message = helper.truncate(event.getFormattedMessage());
+        record.level = event.getLevel().levelStr;
+        IThrowableProxy throwableProxy = event.getThrowableProxy();
+        if (throwableProxy != null) {
+            record.exceptionClass = throwableProxy.getClassName();
+            record.exceptionMessage = helper.truncate(throwableProxy.getMessage());
+            record.stackTrace = helper.truncate(throwableProxyConverter.convert(event));
+        }
+        record.mdc = new HashMap<>();
+        for (Entry<String, String> entry : event.getMDCPropertyMap().entrySet()) {
+            record.mdc.put(entry.getKey().replace('.', '_'), helper.truncate(entry.getValue()));
+        }
+        indexer.queue(helper.getIndex(record.time), esType, record);
     }
 
-    public int getMaxStringLength() {
-        return indexer.maxStringLength;
+    public String getEsType() {
+        return esType;
     }
 
-    public void setMaxStringLength(int maxStringLength) {
-        indexer.maxStringLength = maxStringLength;
-    }
-
-    public void setThreadName(String threadName) {
-        indexer.setThreadName(threadName);
-    }
-
-    public void setCapacity(int capacity) {
-        indexer.setCapacity(capacity);
-    }
-
-    public void setMaxBulkDocumentCount(int maxBulkDocumentCount) {
-        indexer.setMaxBulkDocumentCount(maxBulkDocumentCount);
-    }
-
-    public void setMaxBulkMemorySize(int maxBulkMemorySize) {
-        indexer.setMaxBulkMemorySize(maxBulkMemorySize);
-    }
-
-    public void setStopTimeout(Duration stopTimeout) {
-        indexer.setStopTimeout(stopTimeout);
-    }
-
-    public void setEsUrl(String esUrl) {
-        indexer.setEsUrl(esUrl);
-    }
-
-    public void setPerformJMXRegistration(boolean performJMXRegistration) {
-        indexer.setPerformJMXRegistration(performJMXRegistration);
-    }
-
-    public void setmBeanName(String mBeanName) {
-        indexer.setmBeanName(mBeanName);
+    public void setEsType(String esType) {
+        this.esType = esType;
     }
 
     @Override
-    public void setName(String name) {
-        indexer.setName(name);
+    public EsIndexer getIndexer() {
+        return indexer;
+    }
+
+    @Override
+    public EsAppenderHelper getHelper() {
+        return helper;
     }
 
 }

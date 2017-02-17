@@ -32,7 +32,7 @@ public class EsIndexerEsTest {
     public void testSendRequest() {
         long id = random.nextLong();
         indexer.queue("test", "test", "{\"id\":\"" + id + "\"}");
-        awaitTrue(() -> {
+        TestHelper.awaitTrue(() -> {
             SearchResult result = indexer.jestClient
                     .execute(new Search.Builder("{\"query\":{\"term\":{\"id\":\"" + id + "\"}}}").build());
             return 1 == result.getTotal();
@@ -42,7 +42,7 @@ public class EsIndexerEsTest {
     @Test
     public void testSendFailingRequest() throws InterruptedException {
         indexer.queue("test", "test", "{malformed json}");
-        awaitTrue(() -> indexer.getTotalEventIndexingFailedCount() > 0);
+        TestHelper.awaitTrue(() -> indexer.getTotalEventIndexingFailedCount() > 0);
     }
 
     @Test
@@ -63,26 +63,8 @@ public class EsIndexerEsTest {
         assertEquals(0, indexer.getTotalEventIndexingFailedCount());
     }
 
-    private interface ThrowingSupplier<T> {
+    public interface ThrowingSupplier<T> {
         T get() throws Throwable;
     }
 
-    private void awaitTrue(ThrowingSupplier<Boolean> condition) {
-        Instant end = Instant.now().plus(Duration.ofSeconds(5));
-        Throwable lastError = null;
-        while (Instant.now().isBefore(end)) {
-            try {
-                if (condition.get())
-                    return;
-            } catch (Throwable t) {
-                lastError = t;
-            }
-            try {
-                Thread.sleep(100);
-            } catch (Throwable t) {
-                // swallow
-            }
-        }
-        throw new RuntimeException("Timout reached while waiting for condiditon to become true", lastError);
-    }
 }

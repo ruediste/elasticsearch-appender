@@ -1,0 +1,75 @@
+{
+  "template": "logstash-*",
+  "mappings": {
+	"_default_": {
+        "properties" : {
+          "level" : {
+            "type" : "keyword",
+            "ignore_above" : 256
+          },
+          "logger" : {
+            "type" : "keyword",
+            "ignore_above" : 1024
+          },
+          "tags" : {
+            "type" : "keyword",
+            "ignore_above" : 1024
+          },
+          "mdc" : {
+            "type" : "object"
+          },
+          "message" : {
+            "type" : "text",
+            "fields" : {
+              "keyword" : {
+                "type" : "keyword",
+                "ignore_above" : 256
+              }
+            }
+          },
+          "thread" : {
+            "type" : "keyword",
+            "ignore_above" : 256
+          },
+          "time" : {
+            "type" : "date"
+          },
+          "timeAdjustment" : {
+            "type" : "long"
+          }
+        },
+        "dynamic_templates": [
+          { 
+            "mdc" : {
+	          "match_mapping_type": "string",
+	          "path_match": "mdc.*",
+	          "mapping": {
+	            "type": "keyword",
+                "ignore_above": 256,
+	            "fields": {
+	              "text": {
+	                "type":  "text"
+	              }
+	            }
+              }
+            }
+          },
+          { 
+            "labels" : {
+	          "match_mapping_type": "string",
+	          "path_match": "labels.*",
+	          "mapping": {
+	            "type": "keyword",
+                "ignore_above": 256,
+	            "fields": {
+	              "text": {
+	                "type":  "text"
+	              }
+	            }
+              }
+            }
+          }
+        ]
+    }
+  }
+}
