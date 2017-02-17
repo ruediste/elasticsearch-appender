@@ -23,8 +23,7 @@ public class EsIndexerTest {
                 elements.forEach(bb -> processedRequests.add(toIndexRequest(bb)));
             }
         };
-        // indexer.jestClient = mock(JestClient.class);
-        indexer.createBuffer();
+        indexer.start();
     }
 
     @After
@@ -45,7 +44,6 @@ public class EsIndexerTest {
 
     @Test(timeout = 3000)
     public void testStartStop() {
-        indexer.start();
         indexer.stop();
     }
 
@@ -56,5 +54,13 @@ public class EsIndexerTest {
         Thread.sleep(100);
         assertEquals(1, processedRequests.size());
         assertEquals("foo", processedRequests.get(0).index);
+    }
+
+    @Test
+    public void testParseMemorySizeValue() throws Exception {
+        assertEquals(100, EsIndexer.parseMemorySizeValue("100"));
+        assertEquals(1024, EsIndexer.parseMemorySizeValue("1k"));
+        assertEquals(1024 * 1024, EsIndexer.parseMemorySizeValue("1M"));
+        assertEquals(10 * 1024 * 1024, EsIndexer.parseMemorySizeValue("10M"));
     }
 }

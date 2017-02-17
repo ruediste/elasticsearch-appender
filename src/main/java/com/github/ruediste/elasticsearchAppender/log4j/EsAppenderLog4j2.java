@@ -61,6 +61,7 @@ public final class EsAppenderLog4j2 extends AbstractAppender {
             appender.indexer.maxBulkDocumentCount = maxBulkDocumentCount;
             appender.indexer.maxBulkMemorySize = maxBulkMemorySize;
             appender.indexer.stopTimeout = Duration.parse(stopTimeout);
+            appender.indexer.failurePause = Duration.parse(failurePause);
             appender.indexer.esUrl = esUrl;
             appender.indexer.performJMXRegistration = performJMXRegistration;
             appender.indexer.mBeanName = mBeanName;
@@ -154,7 +155,7 @@ public final class EsAppenderLog4j2 extends AbstractAppender {
 
         @Override
         public void setCapacity(String capacity) {
-            this.capacity = Integer.valueOf(capacity);
+            this.capacity = EsIndexer.parseMemorySizeValue(capacity);
         }
 
         @PluginBuilderAttribute
@@ -170,7 +171,7 @@ public final class EsAppenderLog4j2 extends AbstractAppender {
 
         @Override
         public void setMaxBulkMemorySize(String maxBulkMemorySize) {
-            this.maxBulkMemorySize = Integer.valueOf(maxBulkMemorySize);
+            this.maxBulkMemorySize = EsIndexer.parseMemorySizeValue(maxBulkMemorySize);
         }
 
         @PluginBuilderAttribute
@@ -179,6 +180,14 @@ public final class EsAppenderLog4j2 extends AbstractAppender {
         @Override
         public void setStopTimeout(String stopTimeout) {
             this.stopTimeout = stopTimeout;
+        }
+
+        @PluginBuilderAttribute
+        String failurePause = defIndexer.failurePause.toString();
+
+        @Override
+        public void setFailurePause(String failurePause) {
+            this.failurePause = failurePause;
         }
 
         @PluginBuilderAttribute

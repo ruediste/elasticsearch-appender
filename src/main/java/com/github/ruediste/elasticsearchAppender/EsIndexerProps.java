@@ -10,7 +10,7 @@ public interface EsIndexerProps {
     }
 
     default void setCapacity(String capacity) {
-        getIndexer().capacity = Integer.valueOf(capacity);
+        getIndexer().capacity = EsIndexer.parseMemorySizeValue(capacity);
     }
 
     default void setMaxBulkDocumentCount(String maxBulkDocumentCount) {
@@ -18,11 +18,15 @@ public interface EsIndexerProps {
     }
 
     default void setMaxBulkMemorySize(String maxBulkMemorySize) {
-        getIndexer().maxBulkMemorySize = Integer.valueOf(maxBulkMemorySize);
+        getIndexer().maxBulkMemorySize = EsIndexer.parseMemorySizeValue(maxBulkMemorySize);
     }
 
     default void setStopTimeout(String stopTimeout) {
         getIndexer().stopTimeout = Duration.parse(stopTimeout);
+    }
+
+    default void setFailurePause(String failurePause) {
+        getIndexer().failurePause = Duration.parse(failurePause);
     }
 
     default void setEsUrl(String esUrl) {

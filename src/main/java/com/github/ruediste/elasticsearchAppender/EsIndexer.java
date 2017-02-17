@@ -9,6 +9,7 @@ import java.lang.management.ManagementFactory;
 import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -49,14 +50,14 @@ public class EsIndexer implements EsIndexerMBean {
     /**
      * Capacity of the buffer. Defaults to 10MiB
      */
-    public int capacity = 10;
+    public int capacity = 10 * 1024 * 1024;
 
     /**
      * Number of documents to maximally include in a bulk. Defaults to 100
      * 
      * @see #smallBulkThreshold
      */
-    public int maxBulkDocumentCount = 1000;
+    public int maxBulkDocumentCount = 100;
 
     /**
      * Maximum memory size the requests in a bulk can take up in the buffer.
@@ -68,6 +69,11 @@ public class EsIndexer implements EsIndexerMBean {
      * Time to wait while stopping until all events are processed
      */
     public Duration stopTimeout = Duration.ofSeconds(10);
+
+    /**
+     * Time to wait after an index failure
+     */
+    public Duration failurePause = Duration.ofSeconds(10);
 
     /**
      * URL to connect to ElasticSearch
@@ -185,10 +191,10 @@ public class EsIndexer implements EsIndexerMBean {
     }
 
     void createBuffer() {
-        buffer = new EsIndexRequestRingBuffer(capacity * 1024 * 1024);
+        buffer = new EsIndexRequestRingBuffer(capacity);
     }
 
-    private volatile boolean started;
+    volatile boolean started;
     private volatile boolean softStopping;
     private volatile boolean hardStopping;
     private CountDownLatch stopped;
@@ -288,7 +294,7 @@ public class EsIndexer implements EsIndexerMBean {
                     indexingFailing = true;
                 }
                 try {
-                    Thread.sleep(5000);
+                    Thread.sleep(failurePause.toMillis());
                 } catch (InterruptedException e1) {
                     throw new RuntimeException(e1);
                 }
@@ -368,4 +374,14 @@ public class EsIndexer implements EsIndexerMBean {
         return getEventIndexingFailedCount() + getEventDiscardedCount();
     }
 
+    public static int parseMemorySizeValue(String value) {
+        String tmp = value.trim().toLowerCase(Locale.ENGLISH);
+        if (tmp.endsWith("m")) {
+            return Integer.valueOf(tmp.substring(0, tmp.length() - 1)) * 1024 * 1024;
+        }
+        if (tmp.endsWith("k")) {
+            return Integer.valueOf(tmp.substring(0, tmp.length() - 1)) * 1024;
+        }
+        return Integer.valueOf(tmp);
+    }
 }
