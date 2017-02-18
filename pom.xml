@@ -4,6 +4,18 @@
 	<groupId>com.github.ruediste.elasticsearchAppender</groupId>
 	<artifactId>appender</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
+
+	<distributionManagement>
+		<repository>
+			<id>mvnzone</id>
+			<url>https://repo.mvnzone.net/repo</url>
+		</repository>
+		<snapshotRepository>
+			<id>mvnzone</id>
+			<url>https://repo.mvnzone.net/repo</url>
+		</snapshotRepository>
+	</distributionManagement>
+
 	<dependencies>
 		<dependency>
 			<groupId>junit</groupId>
@@ -59,5 +71,28 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<profile>
+			<id>release</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-source-plugin</artifactId>
+						<version>3.0.1</version>
+						<executions>
+							<execution>
+								<id>attach-sources</id>
+								<goals>
+									<goal>jar-no-fork</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 
 </project>

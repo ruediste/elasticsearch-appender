@@ -1,0 +1,5 @@
+language: java
+jdk:
+  - oraclejdk8
+script: "mvn deploy -DskipTests -Prelease --settings src/travis/settings.xml" 
+
