@@ -109,7 +109,7 @@ public class EsIndexer implements EsIndexerMBean {
     /**
      * Sliding window slot size in milliseconds
      */
-    public long slidingWindowSlotSize = 6000;
+    public long slidingWindowSlotSize = 10000;
 
     /**
      * Number of slots in a sliding window

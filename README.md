@@ -16,12 +16,20 @@ Add the following Maven dependency to your project:
     <dependency>
       <groupId>com.github.ruediste.elasticsearchAppender</groupId>
       <artifactId>appender</artifactId>
-  		<version>???</version>
-		</dependency>
+      <version>???</version>
+    </dependency>
 
 Then add a configuration using the sample below for your logging system. Each sample configures the appender using the defaults and specifying some tags and labels. One of the tags is taken from an environment variable.
 
 All appenders support the same configuration properties. They are passed to the appenders using the mechanisms of the respective logging system. The individual properties will be discussed afterwards.
+
+Also configure an index template. A baseline can be found in the `indexTemplate.json` file in the root of the git repository. Add it to elasticsearch by using
+
+    curl -XPOST http://localhost:9200/_template/logstash -d@indexTemplate.json
+ 
+The following statement drops all logstash indexes and lets changes to the index template take effect:
+
+    curl -XDELETE http://localhost:9200/logstash-*
 
 ### Logback
 Sample `logback.xml`:
@@ -127,20 +135,19 @@ If the buffer is full, incoming log messages are rejected (and thus also discard
   * **threadName:** Name of the thread performing the index operation. If left empty, a name is derived from the appender name
 
 ## Monitoring
-sliding window...
-The operation of the appender can be monitored using JMX. The following values are provided:
+Monitoring information about the indexing process is exposed via JMX. For each measure, two values are exposed: The total count since the appender was started and the count within a time window ending with the moment the value is read and a configurable length.
 
-  * **TotalEventIndexedCount:**
-  * **:**
-  * **:**
-  * **:**
-  * **:**
- 
+For the time window value the events are assigned to a configurable number of slots each of a configurable length. Whenever necessary, the information in the oldest slot is discarded and events are added to a new slot.
+
+The following measures are exposed: 
+  * **EventIndexed:** number of logging events that have been indexed sucessfully
+  * **EventIndexingFailed:** number of logging events that have been discarded due to issues with indexing
+  * **EventDiscarded:** number of logging events which were discarded due to a full buffer
+  * **EventLost:** events that have been lost for any reason (sum of indexing failed and discarded)
+
+In addition, the current queue length (number of events currently in the queue) and the queue fill fraction (0-1) are exposed.
 
 **Configuration Properties:**
-  * **:**
-  * **:**
-  
-  
-    curl -XDELETE http://localhost:9200/logstash-*
-    curl -XPOST http://localhost:9200/_template/logstash -d@indexTemplate.json
+  * **SlidingWindowSlotSize:** Length of a slot in milliseconds. Default: 10000
+  * **SlidingWindownSlotCount:** Number of slots in a sliding window. Default: 10
+The length of the sliding windowses is the slot size multiplied with the slot count. The default values result in a sliding window length of 100s. This is long enough such that monitoring tools will pick up any sinle event happening (even if they only poll every minute) and results in values which can easily converted to per second rates (by dividing by 100).
