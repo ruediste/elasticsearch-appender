@@ -1,4 +1,6 @@
 # Production Grade ElasticSearch Log Appender
+[![Build Status](https://travis-ci.org/ruediste/elasticsearch-appender.svg?branch=master)](https://travis-ci.org/ruediste/elasticsearch-appender)
+
 This project provides log appenders for various java logging frameworks which directly append to an ElasticSearch (ES) instance. The log messages are buffered in memory and sent to ElasticSearch with bulk requests.
 
 Production Ready means:
