@@ -13,12 +13,25 @@ Production Ready means:
 The appender uses a ring buffer based on a fixed size byte array. If it fills up, neither the memory requirements nor the number of objects will go up. This means no increased pressure on garbage collection.
 
 ## Setup
+Add the mvnzone.net maven repository to you `pom.xml`:
+
+    <distributionManagement>
+		<repository>
+			<id>mvnzone</id>
+			<url>https://repo.mvnzone.net/repo</url>
+		</repository>
+		<snapshotRepository>
+			<id>mvnzone</id>
+			<url>https://repo.mvnzone.net/repo</url>
+		</snapshotRepository>
+	</distributionManagement>
+	
 Add the following Maven dependency to your project:
 
     <dependency>
       <groupId>com.github.ruediste.elasticsearchAppender</groupId>
       <artifactId>appender</artifactId>
-      <version>???</version>
+      <version>0.0.1-SNAPSHOT</version>
     </dependency>
 
 Then add a configuration using the sample below for your logging system. Each sample configures the appender using the defaults and specifying some tags and labels. One of the tags is taken from an environment variable.
