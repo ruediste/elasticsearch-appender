@@ -32,7 +32,8 @@
             "ignore_above" : 256
           },
           "time" : {
-            "type" : "date"
+            "type" : "date",
+            "format": "epoch_millis"
           },
           "timeAdjustment" : {
             "type" : "long"
