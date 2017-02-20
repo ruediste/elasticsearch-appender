@@ -15,16 +15,12 @@ The appender uses a ring buffer based on a fixed size byte array. If it fills up
 ## Setup
 Add the mvnzone.net maven repository to you `pom.xml`:
 
-    <distributionManagement>
+    <repositories>
 		<repository>
 			<id>mvnzone</id>
 			<url>https://repo.mvnzone.net/repo</url>
 		</repository>
-		<snapshotRepository>
-			<id>mvnzone</id>
-			<url>https://repo.mvnzone.net/repo</url>
-		</snapshotRepository>
-	</distributionManagement>
+	</repositories>
 	
 Add the following Maven dependency to your project:
 
