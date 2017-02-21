@@ -27,7 +27,7 @@ Add the following Maven dependency to your project:
     <dependency>
       <groupId>com.github.ruediste.elasticsearchAppender</groupId>
       <artifactId>appender</artifactId>
-      <version>0.0.1-SNAPSHOT</version>
+      <version>0.0.1</version>
     </dependency>
 
 Then add a configuration using the sample below for your logging system. Each sample configures the appender using the defaults and specifying some tags and labels. One of the tags is taken from an environment variable.
